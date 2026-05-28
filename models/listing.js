@@ -23,6 +23,10 @@ const listingSchema = new Schema({
     default: [],
   },
   price: Number,
+  priceYearly: {
+    type: Number,
+    default: null,
+  },
   location: String,
   /** Full formatted address from Places / geocoder (optional) */
   locationAddress: {
@@ -55,6 +59,20 @@ const listingSchema = new Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
     required: true,
+  },
+  propertyType: {
+    type: String,
+    enum: ['PG', 'Hostel', 'Room'],
+    default: null,
+  },
+  roomAccessType: {
+    type: String,
+    enum: ['Independent', 'Dependent'],
+    default: null,
+  },
+  facilities: {
+    type: [String],
+    default: [],
   },
   // jiya: Approval status for admin approval system
   approvalStatus: {

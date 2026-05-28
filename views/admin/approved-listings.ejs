@@ -126,9 +126,18 @@
             </div>
             
             <div class="mt-auto">
-              <p class="card-text fw-bold text-primary">
-                ₹<%= listing.price %> <span class="text-muted fw-normal">/night</span>
+              <p class="card-text mb-1 fw-bold text-primary">
+                &#8377;<%= listing.price ? listing.price.toLocaleString("en-IN") : '—' %>
+                <span class="text-muted fw-normal">/ month</span>
               </p>
+              <% if (listing.priceYearly != null && listing.priceYearly > 0) { %>
+                <p class="card-text mb-0">
+                  <span class="price-yearly-pill">
+                    <i class="fa-solid fa-tag"></i>
+                    &#8377; <%= listing.priceYearly.toLocaleString("en-IN") %> / year &bull; Best Value
+                  </span>
+                </p>
+              <% } %>
               
               <div class="btn-group w-100" role="group">
                 <a href="/listings/<%= listing._id %>" class="btn btn-outline-primary btn-sm">

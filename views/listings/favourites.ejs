@@ -9,11 +9,13 @@
   </div>
 </div>
 
+<% var FAV_PT_EMOJIS = {'PG':'🛏️','Hostel':'🏢','Room':'🚪'}; %>
+<% var FAV_RAT_EMOJIS = {'Independent':'🔑','Dependent':'🔗'}; %>
 <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3 g-md-4 mt-3" id="favouritesGrid">
   <% if (allListing && allListing.length > 0) { %>
     <% allListing.forEach(function (listing) { %>
-      <% const statusText = listing.status || 'Available'; %>
-      <% const statusClass = statusText === 'Available' ? 'status-available' : (statusText === 'Booked' ? 'status-booked' : 'status-comingsoon'); %>
+      <% var statusText = listing.status || 'Available'; %>
+      <% var statusClass = statusText === 'Available' ? 'status-available' : (statusText === 'Booked' ? 'status-booked' : 'status-comingsoon'); %>
       <div class="col" data-favourite-card="<%= listing._id %>">
         <a
           href="/listings/<%= listing._id %>"
@@ -83,9 +85,34 @@
                   <span class="text-muted ms-1">(<%= totalReviews %> <%= totalReviews === 1 ? 'review' : 'reviews' %>)</span>
                 </p>
               <% } %>
-              <p class="card-text">
-                &#8377; <%= listing.price ? listing.price.toLocaleString("en-IN") : '—' %> / month
-              </p>
+              <div class="price-block">
+                <div class="price-block-inner">
+                  <div class="price-block-left">
+                    <p class="card-text mb-1">
+                      <span class="fw-semibold">&#8377; <%= listing.price ? listing.price.toLocaleString("en-IN") : '—' %></span>
+                      <span class="text-muted small">/ month</span>
+                    </p>
+                    <% if (listing.priceYearly != null && listing.priceYearly > 0) { %>
+                      <p class="card-text mb-0 mt-1">
+                        <span class="price-yearly-pill">
+                          <i class="fa-solid fa-tag"></i>
+                          &#8377; <%= listing.priceYearly.toLocaleString("en-IN") %> / year &bull; Best Value
+                        </span>
+                      </p>
+                    <% } %>
+                  </div>
+                  <% if (listing.propertyType || listing.roomAccessType) { %>
+                    <div class="room-type-badges-col">
+                      <% if (listing.propertyType) { %>
+                        <span class="room-type-badge"><%= FAV_PT_EMOJIS[listing.propertyType] || '' %>&nbsp;<%= listing.propertyType %></span>
+                      <% } %>
+                      <% if (listing.roomAccessType) { %>
+                        <span class="room-type-badge room-type-badge-access"><%= FAV_RAT_EMOJIS[listing.roomAccessType] || '' %>&nbsp;<%= listing.roomAccessType %></span>
+                      <% } %>
+                    </div>
+                  <% } %>
+                </div>
+              </div>
             </div>
           </div>
         </a>
@@ -143,11 +170,29 @@
       }
     }
 
+    function popFavouriteIcon(icon) {
+      icon.classList.remove("fav-pop");
+      void icon.offsetWidth;
+      icon.classList.add("fav-pop");
+      icon.addEventListener("animationend", function () {
+        icon.classList.remove("fav-pop");
+      }, { once: true });
+    }
+
     document.querySelectorAll(".js-favourite-form").forEach(function (form) {
       form.addEventListener("submit", async function (e) {
         e.preventDefault();
-        var btn = form.querySelector(".js-favourite-btn");
+        var btn  = form.querySelector(".js-favourite-btn");
+        var icon = form.querySelector(".js-favourite-icon");
+
+        // Optimistic visual: immediately flip the icon to outline + pop
+        if (icon) {
+          icon.classList.remove("fa-solid", "text-danger");
+          icon.classList.add("fa-regular");
+          popFavouriteIcon(icon);
+        }
         if (btn) btn.disabled = true;
+
         try {
           var response = await fetch(form.action, {
             method: "POST",
@@ -161,13 +206,29 @@
           if (!data.isFavourite) {
             var listingId = form.getAttribute("data-listing-id");
             var card = grid.querySelector('[data-favourite-card="' + listingId + '"]');
-            if (card) card.remove();
-            syncEmptyState();
+            if (card) {
+              card.classList.add("fav-card-removing");
+              card.addEventListener("animationend", function () {
+                card.remove();
+                syncEmptyState();
+              }, { once: true });
+            }
+          } else {
+            // Server kept it as favourite — revert the optimistic icon flip
+            if (icon) {
+              icon.classList.add("fa-solid", "text-danger");
+              icon.classList.remove("fa-regular");
+            }
+            if (btn) btn.disabled = false;
           }
         } catch (err) {
-          form.submit();
-        } finally {
+          // Revert optimistic icon change on error
+          if (icon) {
+            icon.classList.add("fa-solid", "text-danger");
+            icon.classList.remove("fa-regular");
+          }
           if (btn) btn.disabled = false;
+          form.submit();
         }
       });
     });

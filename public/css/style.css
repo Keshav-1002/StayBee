@@ -270,8 +270,21 @@ main {
   margin-bottom: 0 !important;
 }
 
-.listing-card .card-body > .card-text:last-child {
+.listing-card .card-body .price-block {
   margin-top: auto;
+}
+
+.listing-card .card-body .price-block-inner {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.5rem;
+}
+
+.listing-card .card-body .price-block-left {
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 @media (min-width: 576px) {
@@ -346,8 +359,9 @@ main {
 
 .btn-outline-dark:hover,
 .dlt_btn:hover {
-  background-color: #b8e3e9;
-  border-color: #4f7c82;
+  background-color: #b8e3e9 !important;
+  border-color: #4f7c82 !important;
+  color: #222222 !important;
 }
 
 .dlt_btn {
@@ -373,8 +387,26 @@ main {
 }
 
 .btn-outline-primary:hover {
-  background-color: #b8e3e9;
-  border-color: #4f7c82;
+  background-color: #b8e3e9 !important;
+  border-color: #4f7c82 !important;
+  color: #222222 !important;
+}
+
+/* Home page filter buttons — unified appearance */
+#nearMeBtn,
+#showAllBtn,
+#changeLocationBtn {
+  border-color: #93b1b5 !important;
+  color: #222222 !important;
+  background-color: #ffffff !important;
+}
+
+#nearMeBtn:hover,
+#showAllBtn:hover,
+#changeLocationBtn:hover {
+  background-color: #b8e3e9 !important;
+  border-color: #4f7c82 !important;
+  color: #222222 !important;
 }
 
 .search-trigger {
@@ -685,4 +717,303 @@ h5 {
   #staybeeMapPreview.staybee-map-preview-canvas {
     height: 240px;
   }
+}
+
+/* ── Yearly pricing — card pill (listing cards, my-listings, admin views) ── */
+.price-yearly-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background-color: #d4edda;
+  border: 1px solid #b1dfbb;
+  color: #155724;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.price-yearly-pill i {
+  font-size: 0.65rem;
+  flex-shrink: 0;
+  color: #198754;
+}
+
+/* ── Yearly pricing — detail banner (listing show page) ── */
+.price-yearly-banner {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  background-color: #d4edda;
+  border: 1px solid #b1dfbb;
+  color: #155724;
+  padding: 9px 16px;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin-top: 8px;
+}
+.price-yearly-banner i {
+  color: #198754;
+  flex-shrink: 0;
+}
+.price-yearly-banner .pybanner-amount {
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: #0a3622;
+}
+.price-yearly-banner .pybanner-period {
+  color: #5f6f78;
+  font-size: 0.85rem;
+  font-weight: 400;
+}
+.price-yearly-banner .pybanner-tag {
+  background-color: #198754;
+  color: #ffffff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 9px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+/* ── Room type chip selector (form) ── */
+.room-type-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.room-type-chip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.42rem 1rem;
+  border: 1.5px solid #cfe1e5;
+  border-radius: 999px;
+  background-color: #ffffff;
+  color: #4f7c82;
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease,
+    color 0.15s ease, box-shadow 0.15s ease;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.room-type-chip-btn:hover {
+  background-color: #e7f4f6;
+  border-color: #4f7c82;
+  color: #0b2e33;
+}
+
+.room-type-chip-btn.selected {
+  background-color: #4f7c82;
+  border-color: #4f7c82;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(79, 124, 130, 0.22);
+}
+
+.room-type-chip-btn:focus-visible {
+  outline: 2px solid #4f7c82;
+  outline-offset: 2px;
+}
+
+/* ── Room type badge (cards & detail page) ── */
+.room-type-badge {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 4px;
+  background-color: #e7f4f6 !important;
+  border: 1px solid #cfe1e5 !important;
+  color: #0b2e33 !important;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px !important;
+  line-height: 1.5;
+  white-space: nowrap;
+  text-decoration: none !important;
+  flex-shrink: 0;
+}
+
+.room-type-badge-lg {
+  font-size: 0.88rem !important;
+  font-weight: 600;
+  padding: 6px 16px !important;
+  gap: 6px;
+}
+
+.room-type-badge-access {
+  background-color: #fff8e1 !important;
+  border-color: #ffe082 !important;
+  color: #5d4037 !important;
+}
+
+.room-type-badges-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.3rem;
+  flex-shrink: 0;
+}
+
+/* ── Password toggle (show/hide) ── */
+.pw-wrap {
+  position: relative;
+}
+
+.pw-wrap .form-control {
+  padding-right: 2.6rem !important;
+}
+
+.pw-toggle-btn {
+  position: absolute;
+  top: 50%;
+  right: 0.6rem;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: #9ab5c2;
+  font-size: 0.95rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  transition: color 0.15s ease, background-color 0.15s ease;
+  z-index: 2;
+}
+
+.pw-toggle-btn:hover {
+  color: #cde3ec;
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.pw-toggle-btn:focus-visible {
+  outline: 2px solid rgba(241, 218, 132, 0.7);
+  outline-offset: 1px;
+}
+
+/* ── Facilities / Amenities — form chip grid ── */
+.facilities-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(162px, 1fr));
+  gap: 0.5rem;
+}
+
+.facility-chip-label {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.48rem 0.8rem;
+  border: 1.5px solid #cfe1e5;
+  border-radius: 0.6rem;
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: #4f7c82;
+  background-color: #ffffff;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease,
+    box-shadow 0.15s ease;
+  user-select: none;
+  line-height: 1.3;
+}
+
+.facility-chip-label i {
+  font-size: 0.88rem;
+  width: 1rem;
+  text-align: center;
+  flex-shrink: 0;
+  color: #4f7c82;
+  transition: color 0.15s ease;
+}
+
+.facility-chip-label:hover {
+  background-color: #e7f4f6;
+  border-color: #4f7c82;
+}
+
+.facility-chip-label.facility-selected {
+  background-color: #4f7c82;
+  border-color: #4f7c82;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(79, 124, 130, 0.22);
+}
+
+.facility-chip-label.facility-selected i {
+  color: #ffffff;
+}
+
+/* ── Facilities / Amenities — show-page display grid ── */
+.facilities-display-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
+  gap: 0.55rem;
+}
+
+.facility-display-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background-color: #f5fafc;
+  border: 1px solid #daedf1;
+  border-radius: 0.6rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #2c5f66;
+}
+
+.facility-display-item i {
+  font-size: 0.88rem;
+  color: #4f7c82;
+  width: 1rem;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+@media (max-width: 575.98px) {
+  .facilities-form-grid,
+  .facilities-display-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ── Favourite heart icon — transition & pop animation ── */
+.js-favourite-icon {
+  display: inline-block;
+  transition: color 0.18s ease, opacity 0.18s ease;
+  will-change: transform;
+}
+
+@keyframes fav-pop {
+  0%   { transform: scale(1); }
+  35%  { transform: scale(1.45); }
+  65%  { transform: scale(0.82); }
+  100% { transform: scale(1); }
+}
+
+.js-favourite-icon.fav-pop {
+  animation: fav-pop 0.32s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+/* Fade + shrink when a favourite card is being removed */
+@keyframes fav-card-out {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(0.93); }
+}
+
+.fav-card-removing {
+  animation: fav-card-out 0.28s ease forwards;
+  pointer-events: none;
 }

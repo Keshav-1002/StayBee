@@ -1,15 +1,133 @@
 /**
- * StayBee — Google Maps JavaScript API: picker & lazy preview.
+ * StayBee — Map integration: Google Maps primary, Leaflet/OpenStreetMap fallback.
  *
- * Loads the API once (core library only; Geocoder + Map + Marker — no Places Autocomplete).
+ * • Google Maps JavaScript API is tried first (requires GOOGLE_MAPS_API_KEY).
+ * • If Google Maps authentication fails (wrong key, missing API enable, referrer
+ *   restriction, billing not set up), Leaflet + OpenStreetMap is loaded from CDN
+ *   automatically — no error shown to the user, just a working map.
  */
 (function (global) {
-  var SCRIPT_ID = "staybee-google-maps-js";
+  "use strict";
+
+  var GMAPS_SCRIPT_ID = "staybee-google-maps-js";
+  var LEAFLET_SCRIPT_ID = "staybee-leaflet-js";
+  var LEAFLET_CSS_ID = "staybee-leaflet-css";
+  var LEAFLET_BASE = "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/";
+
+  // Stored so gm_authFailure can reject the pending load promise.
+  var _mapsLoadReject = null;
+
+  // ─── Leaflet fallback ────────────────────────────────────────────────────
 
   /**
-   * @param {string} apiKey
-   * @returns {Promise<void>}
+   * Replaces the contents of canvasEl with a Leaflet map centred on [lat, lng].
+   * Safe to call even after Google Maps has written its error overlay to the element.
    */
+  function initLeafletFallback(canvasEl, lat, lng) {
+    if (!canvasEl || !isFinite(lat) || !isFinite(lng)) return;
+
+    var wrap = canvasEl.closest("[data-staybee-map-preview-wrap]");
+    var loadingEl = wrap && wrap.querySelector("[data-staybee-map-preview-loading]");
+    var errEl = wrap && wrap.querySelector("[data-staybee-map-preview-error]");
+
+    // Wipe Google's error overlay and make sure the canvas is visible.
+    canvasEl.innerHTML = "";
+    canvasEl.style.display = "";
+    if (loadingEl) loadingEl.classList.add("d-none");
+    if (errEl) errEl.classList.add("d-none");
+
+    function showFallbackError() {
+      canvasEl.style.display = "none";
+      if (errEl) {
+        errEl.textContent =
+          "Map could not be loaded. Use “Open in Google Maps” below.";
+        errEl.classList.remove("d-none");
+      }
+    }
+
+    function buildLeafletMap() {
+      var L = global.L;
+      if (!L || typeof L.map !== "function") {
+        showFallbackError();
+        return;
+      }
+      try {
+        // Fix marker image paths — needed when Leaflet is loaded from a CDN
+        // because the CSS-computed relative path points to the wrong origin.
+        delete L.Icon.Default.prototype._getIconUrl;
+        L.Icon.Default.mergeOptions({
+          iconRetinaUrl: LEAFLET_BASE + "images/marker-icon-2x.png",
+          iconUrl:       LEAFLET_BASE + "images/marker-icon.png",
+          shadowUrl:     LEAFLET_BASE + "images/marker-shadow.png",
+        });
+
+        var lmap = L.map(canvasEl, {
+          scrollWheelZoom: false,
+          zoomControl: true,
+        }).setView([lat, lng], 15);
+
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          attribution:
+            '© <a href="https://www.openstreetmap.org/copyright" ' +
+            'target="_blank" rel="noopener">OpenStreetMap</a> contributors',
+          maxZoom: 19,
+        }).addTo(lmap);
+
+        L.marker([lat, lng]).addTo(lmap);
+      } catch (e) {
+        console.error("[StayBee Maps] Leaflet init error:", e);
+        showFallbackError();
+      }
+    }
+
+    // Inject Leaflet CSS once
+    if (!document.getElementById(LEAFLET_CSS_ID)) {
+      var link = document.createElement("link");
+      link.id = LEAFLET_CSS_ID;
+      link.rel = "stylesheet";
+      link.href = LEAFLET_BASE + "leaflet.css";
+      document.head.appendChild(link);
+    }
+
+    // If Leaflet JS is already loaded and ready, use it immediately.
+    if (global.L && typeof global.L.map === "function") {
+      buildLeafletMap();
+      return;
+    }
+
+    // If a Leaflet script tag is already in the DOM (loading in progress), poll.
+    if (document.getElementById(LEAFLET_SCRIPT_ID)) {
+      var polls = 0;
+      var iv = setInterval(function () {
+        polls++;
+        if (global.L && typeof global.L.map === "function") {
+          clearInterval(iv);
+          buildLeafletMap();
+        } else if (polls > 120) {
+          clearInterval(iv);
+          showFallbackError();
+        }
+      }, 50);
+      return;
+    }
+
+    // Load Leaflet JS from CDN.
+    var s = document.createElement("script");
+    s.id = LEAFLET_SCRIPT_ID;
+    s.src = LEAFLET_BASE + "leaflet.js";
+    s.onload = function () { buildLeafletMap(); };
+    s.onerror = function () {
+      console.error("[StayBee Maps] Failed to load Leaflet from CDN.");
+      showFallbackError();
+    };
+    document.head.appendChild(s);
+  }
+
+  // Expose so the preview IIFE's .catch() can reach it.
+  global.__stayBeeInitLeafletFallback = initLeafletFallback;
+
+  // ─── Google Maps loader ──────────────────────────────────────────────────
+
   function ensureGoogleMapsLoaded(apiKey) {
     if (!apiKey || String(apiKey).trim() === "") {
       return Promise.reject(new Error("Google Maps API key is missing."));
@@ -28,7 +146,9 @@
     }
 
     global.__stayBeeMapsPromise = new Promise(function (resolve, reject) {
-      var existing = document.getElementById(SCRIPT_ID);
+      _mapsLoadReject = reject;
+
+      var existing = document.getElementById(GMAPS_SCRIPT_ID);
       if (existing) {
         var tries = 0;
         var iv = setInterval(function () {
@@ -39,13 +159,15 @@
             typeof global.google.maps.Map === "function"
           ) {
             clearInterval(iv);
+            _mapsLoadReject = null;
             resolve();
           } else if (tries > 120) {
             clearInterval(iv);
             global.__stayBeeMapsPromise = null;
+            _mapsLoadReject = null;
             reject(
               new Error(
-                "Google Maps script is present but the API did not initialize.",
+                "Google Maps script tag is present but the API did not initialise.",
               ),
             );
           }
@@ -55,9 +177,8 @@
 
       var cbName = "__stayBeeGmapsCb_" + Date.now();
       global[cbName] = function () {
-        try {
-          delete global[cbName];
-        } catch (e) {}
+        _mapsLoadReject = null;
+        try { delete global[cbName]; } catch (e) {}
         if (
           global.google &&
           global.google.maps &&
@@ -66,16 +187,12 @@
           resolve();
         } else {
           global.__stayBeeMapsPromise = null;
-          reject(
-            new Error(
-              "Maps JavaScript API loaded but Map is unavailable.",
-            ),
-          );
+          reject(new Error("Maps JavaScript API loaded but Map constructor is unavailable."));
         }
       };
 
       var s = document.createElement("script");
-      s.id = SCRIPT_ID;
+      s.id = GMAPS_SCRIPT_ID;
       s.async = true;
       s.src =
         "https://maps.googleapis.com/maps/api/js?key=" +
@@ -84,10 +201,9 @@
         cbName;
       s.onerror = function () {
         global.__stayBeeMapsPromise = null;
-        try {
-          delete global[cbName];
-        } catch (e2) {}
-        reject(new Error("Failed to load the Google Maps JavaScript API."));
+        _mapsLoadReject = null;
+        try { delete global[cbName]; } catch (e) {}
+        reject(new Error("Failed to fetch the Google Maps JavaScript API script."));
       };
       document.head.appendChild(s);
     });
@@ -98,23 +214,63 @@
   global.__stayBeeEnsureGoogleMapsLoaded = ensureGoogleMapsLoaded;
   global.__stayBeeEnsureGoogleMapsWithPlaces = ensureGoogleMapsLoaded;
 
+  // ─── gm_authFailure hook ─────────────────────────────────────────────────
+
   if (!global.__stayBeeGmAuthHooked) {
     global.__stayBeeGmAuthHooked = true;
     var prevAuthFail = global.gm_authFailure;
+
     global.gm_authFailure = function () {
       if (typeof prevAuthFail === "function") {
-        try {
-          prevAuthFail();
-        } catch (e) {}
+        try { prevAuthFail(); } catch (e) {}
       }
-      console.warn(
-        "[StayBee Maps] Authentication failed. Check API key, Maps JavaScript API enabled, billing, and HTTP referrer restrictions for this URL.",
+
+      console.error(
+        "[StayBee Maps] Google Maps authentication failed.\n" +
+          "  Possible causes:\n" +
+          "  1. Maps JavaScript API not enabled — enable it at:\n" +
+          "     https://console.cloud.google.com/apis/library/maps-backend.googleapis.com\n" +
+          "  2. Billing not active on the Google Cloud project.\n" +
+          "  3. API key HTTP referrer restrictions block this URL.\n" +
+          "     Add these patterns in Cloud Console → Credentials → API key:\n" +
+          "       http://localhost:3000/*\n" +
+          "       http://localhost/*\n" +
+          "       https://yourdomain.com/*\n" +
+          "  Falling back to OpenStreetMap (Leaflet).",
       );
+
+      // Case 1 — auth failed before/during script init: reject the pending
+      // promise so the preview IIFE's .catch() runs and triggers Leaflet.
+      if (_mapsLoadReject) {
+        var rej = _mapsLoadReject;
+        _mapsLoadReject = null;
+        global.__stayBeeMapsPromise = null;
+        rej(new Error("google-maps-auth-failure"));
+      }
+
+      // Case 2 — auth failed after the map was already rendered (Google does
+      // an async key check after drawing the first tile). Switch to Leaflet.
+      var previewCfg = global.__STAYBEE_MAP_PREVIEW__;
+      var previewEl = document.getElementById("staybeeMapPreview");
+      if (
+        previewEl &&
+        previewCfg &&
+        previewCfg.lat != null &&
+        previewCfg.lng != null
+      ) {
+        initLeafletFallback(
+          previewEl,
+          Number(previewCfg.lat),
+          Number(previewCfg.lng),
+        );
+      }
     };
   }
 })(typeof window !== "undefined" ? window : this);
 
+// ─── Map Picker (new / edit listing forms) ──────────────────────────────────
 (function () {
+  "use strict";
   var cfg = window.__STAYBEE_MAP_PICKER__;
   if (!cfg || !cfg.apiKey) return;
 
@@ -143,9 +299,7 @@
     return function () {
       var args = arguments;
       clearTimeout(t);
-      t = setTimeout(function () {
-        fn.apply(null, args);
-      }, ms);
+      t = setTimeout(function () { fn.apply(null, args); }, ms);
     };
   }
 
@@ -159,12 +313,9 @@
 
   function isValidLatLng(lat, lng) {
     return (
-      lat != null &&
-      lng != null &&
-      lat >= -90 &&
-      lat <= 90 &&
-      lng >= -180 &&
-      lng <= 180
+      lat != null && lng != null &&
+      lat >= -90 && lat <= 90 &&
+      lng >= -180 && lng <= 180
     );
   }
 
@@ -173,18 +324,16 @@
     if (!mapEl) return;
 
     var section = document.querySelector("[data-staybee-map-section]");
-    if (section && section.getAttribute("data-staybee-maps-initialized") === "1") {
-      return;
-    }
+    if (section && section.getAttribute("data-staybee-maps-initialized") === "1") return;
     if (section) section.setAttribute("data-staybee-maps-initialized", "1");
 
-    var latInput = document.getElementById("listingLatitude");
-    var lngInput = document.getElementById("listingLongitude");
+    var latInput  = document.getElementById("listingLatitude");
+    var lngInput  = document.getElementById("listingLongitude");
     var addrInput = document.getElementById("listingLocationAddress");
-    var clearBtn = document.getElementById("staybeeMapClearLocation");
-    var geoBtn = document.getElementById("staybeeUseCurrentLocation");
+    var clearBtn  = document.getElementById("staybeeMapClearLocation");
+    var geoBtn    = document.getElementById("staybeeUseCurrentLocation");
 
-    var center = { lat: cfg.centerLat, lng: cfg.centerLng };
+    var center = { lat: Number(cfg.centerLat), lng: Number(cfg.centerLng) };
     var map = new google.maps.Map(mapEl, {
       center: center,
       zoom: cfg.hasExistingCoords ? 15 : 5,
@@ -199,19 +348,15 @@
       animation: google.maps.Animation.DROP,
     });
 
-    if (!cfg.hasExistingCoords) {
-      marker.setVisible(false);
-    }
+    if (!cfg.hasExistingCoords) marker.setVisible(false);
 
     var geocoder = new google.maps.Geocoder();
     var syncingFromMap = false;
 
     function fillCoordInputs(lat, lng) {
-      var ls = lat.toFixed(7);
-      var ln = lng.toFixed(7);
       syncingFromMap = true;
-      if (latInput) latInput.value = ls;
-      if (lngInput) lngInput.value = ln;
+      if (latInput) latInput.value = lat.toFixed(7);
+      if (lngInput) lngInput.value = lng.toFixed(7);
       syncingFromMap = false;
     }
 
@@ -238,18 +383,13 @@
       if (syncingFromMap) return;
       var lat = parseCoord(latInput ? latInput.value : "");
       var lng = parseCoord(lngInput ? lngInput.value : "");
-      if (lat == null && lng == null) {
-        hidePickerError();
-        return;
-      }
+      if (lat == null && lng == null) { hidePickerError(); return; }
       if (lat == null || lng == null) {
         showPickerError("Enter both latitude and longitude, or clear both fields.");
         return;
       }
       if (!isValidLatLng(lat, lng)) {
-        showPickerError(
-          "Use valid latitude (−90 to 90) and longitude (−180 to 180), or use the map.",
-        );
+        showPickerError("Use valid latitude (−90 to 90) and longitude (−180 to 180), or use the map.");
         return;
       }
       hidePickerError();
@@ -262,10 +402,7 @@
       if (syncingFromMap) return;
       var lat = parseCoord(latInput ? latInput.value : "");
       var lng = parseCoord(lngInput ? lngInput.value : "");
-      if (lat == null && lng == null) {
-        hidePickerError();
-        return;
-      }
+      if (lat == null && lng == null) { hidePickerError(); return; }
       if (!isValidLatLng(lat, lng)) return;
       hidePickerError();
       var ll = new google.maps.LatLng(lat, lng);
@@ -276,43 +413,30 @@
     var debouncedWhileTyping = debounce(trySyncManualCoordsWhileTyping, 450);
 
     if (latInput) {
-      latInput.addEventListener("input", function () {
-        if (!syncingFromMap) debouncedWhileTyping();
-      });
-      latInput.addEventListener("blur", function () {
-        if (!syncingFromMap) applyManualCoordinates();
-      });
+      latInput.addEventListener("input", function () { if (!syncingFromMap) debouncedWhileTyping(); });
+      latInput.addEventListener("blur",  function () { if (!syncingFromMap) applyManualCoordinates(); });
     }
     if (lngInput) {
-      lngInput.addEventListener("input", function () {
-        if (!syncingFromMap) debouncedWhileTyping();
-      });
-      lngInput.addEventListener("blur", function () {
-        if (!syncingFromMap) applyManualCoordinates();
-      });
+      lngInput.addEventListener("input", function () { if (!syncingFromMap) debouncedWhileTyping(); });
+      lngInput.addEventListener("blur",  function () { if (!syncingFromMap) applyManualCoordinates(); });
     }
 
     if (cfg.initialLat != null && cfg.initialLng != null) {
       setPosition(
-        { lat: cfg.initialLat, lng: cfg.initialLng },
+        { lat: Number(cfg.initialLat), lng: Number(cfg.initialLng) },
         cfg.initialAddress || "",
         true,
       );
       map.setZoom(15);
     }
 
-    map.addListener("click", function (e) {
-      setPosition(e.latLng);
-    });
-
+    map.addListener("click", function (e) { setPosition(e.latLng); });
     marker.addListener("dragend", function () {
       var pos = marker.getPosition();
       if (pos) setPosition(pos);
     });
 
-    google.maps.event.addListenerOnce(map, "idle", function () {
-      hidePickerLoading();
-    });
+    google.maps.event.addListenerOnce(map, "idle", function () { hidePickerLoading(); });
 
     if (geoBtn) {
       geoBtn.addEventListener("click", function () {
@@ -327,23 +451,16 @@
           function (pos) {
             geoBtn.disabled = false;
             geoBtn.removeAttribute("aria-busy");
-            var lat = pos.coords.latitude;
-            var lng = pos.coords.longitude;
-            setPosition({ lat: lat, lng: lng }, null, false);
+            setPosition({ lat: pos.coords.latitude, lng: pos.coords.longitude }, null, false);
             map.setZoom(16);
           },
           function (err) {
             geoBtn.disabled = false;
             geoBtn.removeAttribute("aria-busy");
             var msg = "Could not retrieve your current location.";
-            if (err && err.code === 1) {
-              msg =
-                "Location permission denied. Allow location in your browser settings, or set the pin manually.";
-            } else if (err && err.code === 2) {
-              msg = "Your position is unavailable. Try again or place the pin on the map.";
-            } else if (err && err.code === 3) {
-              msg = "Location request timed out. Try again.";
-            }
+            if (err && err.code === 1) msg = "Location permission denied. Allow location in your browser settings, or set the pin manually.";
+            else if (err && err.code === 2) msg = "Your position is unavailable. Try again or place the pin on the map.";
+            else if (err && err.code === 3) msg = "Location request timed out. Try again.";
             showPickerError(msg);
           },
           { enableHighAccuracy: true, timeout: 20000, maximumAge: 60000 },
@@ -382,44 +499,55 @@
   }
 
   window.__stayBeeEnsureGoogleMapsLoaded(cfg.apiKey)
-    .then(function () {
-      initPicker();
-    })
+    .then(function () { initPicker(); })
     .catch(function (err) {
       hidePickerLoading();
       showPickerError(
-        err.message ||
-          "Could not load Google Maps. Verify GOOGLE_MAPS_API_KEY, referrer restrictions, and that Maps JavaScript API is enabled.",
+        err.message === "google-maps-auth-failure"
+          ? "Google Maps authentication failed. Check that the Maps JavaScript API is enabled, " +
+            "billing is active, and HTTP referrer restrictions include this domain."
+          : err.message ||
+            "Could not load Google Maps. Verify the API key, referrer restrictions, " +
+            "and that Maps JavaScript API is enabled in Google Cloud Console.",
       );
     });
 })();
 
+// ─── Map Preview (listing detail / show page) ───────────────────────────────
 (function () {
+  "use strict";
   var cfg = window.__STAYBEE_MAP_PREVIEW__;
   if (!cfg || !cfg.apiKey || cfg.lat == null || cfg.lng == null) return;
 
   var el = document.getElementById("staybeeMapPreview");
   if (!el) return;
 
+  var lat = Number(cfg.lat);
+  var lng = Number(cfg.lng);
+
   function showPreviewError(msg) {
     var wrap = el.closest("[data-staybee-map-preview-wrap]");
-    var err = wrap && wrap.querySelector("[data-staybee-map-preview-error]");
-    var load = wrap && wrap.querySelector("[data-staybee-map-preview-loading]");
-    if (load) load.classList.add("d-none");
-    if (err) {
-      err.textContent = msg;
-      err.classList.remove("d-none");
+    var errEl = wrap && wrap.querySelector("[data-staybee-map-preview-error]");
+    var loadEl = wrap && wrap.querySelector("[data-staybee-map-preview-loading]");
+    if (loadEl) loadEl.classList.add("d-none");
+    if (errEl) {
+      errEl.textContent = msg;
+      errEl.classList.remove("d-none");
     }
   }
 
   function hidePreviewLoading() {
     var wrap = el.closest("[data-staybee-map-preview-wrap]");
-    var load = wrap && wrap.querySelector("[data-staybee-map-preview-loading]");
-    if (load) load.classList.add("d-none");
+    var loadEl = wrap && wrap.querySelector("[data-staybee-map-preview-loading]");
+    if (loadEl) loadEl.classList.add("d-none");
   }
 
-  function initPreview() {
-    var pos = { lat: cfg.lat, lng: cfg.lng };
+  function initGooglePreview() {
+    if (!isFinite(lat) || !isFinite(lng)) {
+      showPreviewError("Invalid coordinates stored for this listing.");
+      return;
+    }
+    var pos = { lat: lat, lng: lng };
     var map = new google.maps.Map(el, {
       center: pos,
       zoom: 15,
@@ -432,21 +560,33 @@
       position: pos,
       animation: google.maps.Animation.DROP,
     });
-    hidePreviewLoading();
+    google.maps.event.addListenerOnce(map, "idle", function () {
+      hidePreviewLoading();
+    });
   }
 
   function start() {
+    if (!isFinite(lat) || !isFinite(lng)) {
+      showPreviewError("Invalid coordinates stored for this listing.");
+      return;
+    }
+
     window
       .__stayBeeEnsureGoogleMapsLoaded(cfg.apiKey)
       .then(function () {
-        initPreview();
+        initGooglePreview();
       })
       .catch(function (err) {
-        hidePreviewLoading();
-        showPreviewError(
-          err.message ||
-            "Map could not be loaded. You can still use Open in Google Maps below.",
-        );
+        // Google Maps auth failed or could not load — switch to Leaflet fallback.
+        // initLeafletFallback handles its own loading indicator / error display.
+        if (typeof window.__stayBeeInitLeafletFallback === "function") {
+          window.__stayBeeInitLeafletFallback(el, lat, lng);
+        } else {
+          hidePreviewLoading();
+          showPreviewError(
+            "Map could not be loaded. Use “Open in Google Maps” below.",
+          );
+        }
       });
   }
 

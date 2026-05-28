@@ -30,6 +30,102 @@
 
         <textarea name="listing[description]" class="form-control"></textarea>
       </div>
+
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Property Type</label>
+        <div class="form-text mb-2">Select the type of property you are listing.</div>
+        <input type="hidden" name="listing[propertyType]" id="propertyTypeHidden" value="">
+        <div class="room-type-chips" id="propertyTypeChips">
+          <button type="button" class="room-type-chip-btn" data-value="PG">🛏️ PG</button>
+          <button type="button" class="room-type-chip-btn" data-value="Hostel">🏢 Hostel</button>
+          <button type="button" class="room-type-chip-btn" data-value="Room">🚪 Room</button>
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Room Access Type</label>
+        <div class="form-text mb-2">Select how the room is accessed.</div>
+        <input type="hidden" name="listing[roomAccessType]" id="roomAccessTypeHidden" value="">
+        <div class="room-type-chips" id="roomAccessTypeChips">
+          <button type="button" class="room-type-chip-btn" data-value="Independent">🔑 Independent</button>
+          <button type="button" class="room-type-chip-btn" data-value="Dependent">🔗 Dependent</button>
+        </div>
+      </div>
+
+      <script>
+        (function () {
+          function initChips(hiddenId, chipsId) {
+            var hidden = document.getElementById(hiddenId);
+            var chips = document.getElementById(chipsId);
+            if (!hidden || !chips) return;
+            function syncVisual() {
+              chips.querySelectorAll(".room-type-chip-btn").forEach(function (b) {
+                b.classList.toggle("selected", b.getAttribute("data-value") === hidden.value);
+              });
+            }
+            syncVisual();
+            chips.querySelectorAll(".room-type-chip-btn").forEach(function (btn) {
+              btn.addEventListener("click", function () {
+                var val = btn.getAttribute("data-value");
+                hidden.value = (hidden.value === val) ? "" : val;
+                syncVisual();
+              });
+            });
+            var form = hidden.closest("form");
+            if (form) {
+              form.addEventListener("submit", function () {
+                var sel = chips.querySelector(".room-type-chip-btn.selected");
+                hidden.value = sel ? sel.getAttribute("data-value") : hidden.value;
+              });
+            }
+          }
+          initChips("propertyTypeHidden", "propertyTypeChips");
+          initChips("roomAccessTypeHidden", "roomAccessTypeChips");
+        })();
+      </script>
+
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Facilities &amp; Amenities</label>
+        <div class="form-text mb-2">Select all facilities available at this property.</div>
+        <input type="hidden" name="listing[facilities]" id="facilitiesHidden" value="">
+        <div class="facilities-form-grid">
+          <label class="facility-chip-label"><i class="fa-solid fa-wifi"></i> Wi-Fi</label>
+          <label class="facility-chip-label"><i class="fa-solid fa-video"></i> CCTV</label>
+          <label class="facility-chip-label"><i class="fa-solid fa-fire-flame-curved"></i> Geyser</label>
+          <label class="facility-chip-label"><i class="fa-solid fa-bolt"></i> Inverter</label>
+          <label class="facility-chip-label"><i class="fa-solid fa-snowflake"></i> Air Conditioner (AC)</label>
+          <label class="facility-chip-label"><i class="fa-solid fa-square-parking"></i> Parking</label>
+          <label class="facility-chip-label"><i class="fa-solid fa-soap"></i> Laundry</label>
+          <label class="facility-chip-label"><i class="fa-solid fa-faucet"></i> Water Supply</label>
+          <label class="facility-chip-label"><i class="fa-solid fa-bath"></i> Attached Bathroom</label>
+          <label class="facility-chip-label"><i class="fa-solid fa-utensils"></i> Kitchen Access</label>
+          <label class="facility-chip-label"><i class="fa-solid fa-plug"></i> Power Backup</label>
+          <label class="facility-chip-label"><i class="fa-solid fa-pen-ruler"></i> Study Table</label>
+          <label class="facility-chip-label"><i class="fa-solid fa-shield-halved"></i> Security Guard</label>
+        </div>
+        <script>
+          (function () {
+            var hidden = document.getElementById("facilitiesHidden");
+            var labels = document.querySelectorAll(".facilities-form-grid .facility-chip-label");
+            var selected = new Set();
+
+            labels.forEach(function (label) {
+              var name = label.textContent.trim();
+              label.addEventListener("click", function () {
+                if (selected.has(name)) {
+                  selected.delete(name);
+                  label.classList.remove("facility-selected");
+                } else {
+                  selected.add(name);
+                  label.classList.add("facility-selected");
+                }
+                hidden.value = Array.from(selected).join(",");
+              });
+            });
+          })();
+        </script>
+      </div>
+
       <div class="mb-3">
         <label for="images" class="form-label">Upload Images</label>
         <br />
@@ -46,29 +142,52 @@
           You can select multiple images. Supported formats: JPG, JPEG, PNG.
         </div>
       </div>
-      <div class="row">
-        <div class="mb-3 col-md-4">
-          <label for="price" class="form-label">Price</label>
-          <br />
-
-          <input
-            name="listing[price]"
-            placeholder="Enter Price"
-            type="number"
-            class="form-control"
-          />
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Pricing</label>
+        <div class="row g-3">
+          <div class="col-sm-6">
+            <label class="form-label small text-muted mb-1">Monthly Rent (₹)</label>
+            <div class="input-group">
+              <span class="input-group-text text-muted">₹</span>
+              <input
+                name="listing[price]"
+                placeholder="e.g. 12000"
+                type="number"
+                min="0"
+                class="form-control"
+              />
+              <span class="input-group-text text-muted small">/ mo</span>
+            </div>
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label small text-muted mb-1">
+              Yearly Rent (₹)
+              <span class="badge bg-success-subtle text-success fw-normal ms-1" style="font-size:0.7rem;">Optional</span>
+            </label>
+            <div class="input-group">
+              <span class="input-group-text text-muted">₹</span>
+              <input
+                name="listing[priceYearly]"
+                placeholder="e.g. 120000"
+                type="number"
+                min="0"
+                class="form-control"
+              />
+              <span class="input-group-text text-muted small">/ yr</span>
+            </div>
+            <div class="form-text">Offer a discounted yearly rate to attract long-term tenants.</div>
+          </div>
         </div>
-        <div class="mb-3 col-md-8">
-          <label for="country" class="form-label">Country</label>
-          <br />
-
-          <input
-            name="listing[country]"
-            placeholder="Enter country"
-            type="text"
-            class="form-control"
-          />
-        </div>
+      </div>
+      <div class="mb-3">
+        <label for="country" class="form-label">Country</label>
+        <br />
+        <input
+          name="listing[country]"
+          placeholder="Enter country"
+          type="text"
+          class="form-control"
+        />
       </div>
 
       <div class="mb-3">

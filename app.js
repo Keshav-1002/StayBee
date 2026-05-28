@@ -72,6 +72,35 @@ app.use((req, res, next) => {
   next();
 });
 
+const PROPERTY_TYPES = ['PG', 'Hostel', 'Room'];
+const ROOM_ACCESS_TYPES = ['Independent', 'Dependent'];
+const FACILITIES_LIST = [
+  'Wi-Fi', 'CCTV', 'Geyser', 'Inverter', 'Air Conditioner (AC)',
+  'Parking', 'Laundry', 'Water Supply', 'Attached Bathroom',
+  'Kitchen Access', 'Power Backup', 'Study Table', 'Security Guard',
+];
+
+function parsePropertyType(raw) {
+  if (!raw || typeof raw !== 'string') return null;
+  return PROPERTY_TYPES.includes(raw.trim()) ? raw.trim() : null;
+}
+
+function parseRoomAccessType(raw) {
+  if (!raw || typeof raw !== 'string') return null;
+  return ROOM_ACCESS_TYPES.includes(raw.trim()) ? raw.trim() : null;
+}
+
+function parseFacilities(raw) {
+  if (!raw || typeof raw !== 'string') return [];
+  return raw.split(',').map(v => v.trim()).filter(v => FACILITIES_LIST.includes(v));
+}
+
+function parsePriceYearly(raw) {
+  if (raw === undefined || raw === null || raw === '') return null;
+  const n = Number(raw);
+  return (!isNaN(n) && n > 0) ? n : null;
+}
+
 function parseListingGeoFields(listingBody) {
   if (!listingBody || typeof listingBody !== "object") return {};
   const latRaw = listingBody.latitude;
@@ -143,6 +172,25 @@ async function main() {
       });
     }
   }
+  // Back-fill priceYearly: null for documents that pre-date the field
+  await Listing.updateMany(
+    { priceYearly: { $exists: false } },
+    { $set: { priceYearly: null } }
+  );
+  // Back-fill facilities for documents that pre-date the field
+  await Listing.updateMany(
+    { facilities: { $exists: false } },
+    { $set: { facilities: [] } }
+  );
+  // Back-fill propertyType / roomAccessType for documents that pre-date the split
+  await Listing.updateMany(
+    { propertyType: { $exists: false } },
+    { $set: { propertyType: null } }
+  );
+  await Listing.updateMany(
+    { roomAccessType: { $exists: false } },
+    { $set: { roomAccessType: null } }
+  );
 }
 
 app.get("/", (req, res) => {
@@ -340,6 +388,14 @@ app.get("/listings", async (req, res) => {
     allListing = await query;
   }
 
+  // Rating sort: applied after geo/non-geo block so it works for both paths.
+  // Listings with no rating (null) are always pushed to the end.
+  if (sort === "rating_desc") {
+    allListing.sort((a, b) => (b.averageRating ?? -1) - (a.averageRating ?? -1));
+  } else if (sort === "rating_asc") {
+    allListing.sort((a, b) => (a.averageRating ?? Infinity) - (b.averageRating ?? Infinity));
+  }
+
   let userFavouriteIds = [];
   if (req.session?.user?.id) {
     const u = await User.findById(req.session.user.id).select("favourites");
@@ -421,6 +477,11 @@ app.post(
       delete listingData.latitude;
       delete listingData.longitude;
       delete listingData.locationAddress;
+
+      listingData.priceYearly = parsePriceYearly(listingData.priceYearly);
+      listingData.propertyType = parsePropertyType(listingData.propertyType);
+      listingData.roomAccessType = parseRoomAccessType(listingData.roomAccessType);
+      listingData.facilities = parseFacilities(listingData.facilities);
 
       if (!listingData.status) listingData.status = "Available";
 
@@ -509,6 +570,19 @@ app.put(
       delete updatedData.longitude;
       delete updatedData.locationAddress;
 
+      updatedData.priceYearly = parsePriceYearly(updatedData.priceYearly);
+      if ('propertyType' in rawListing) {
+        updatedData.propertyType = parsePropertyType(updatedData.propertyType);
+      } else {
+        delete updatedData.propertyType;
+      }
+      if ('roomAccessType' in rawListing) {
+        updatedData.roomAccessType = parseRoomAccessType(updatedData.roomAccessType);
+      } else {
+        delete updatedData.roomAccessType;
+      }
+      updatedData.facilities = parseFacilities(updatedData.facilities);
+
       if (!updatedData.status) updatedData.status = "Available";
 
       const deleteImagesRaw = req.body.deleteImages;
@@ -540,21 +614,23 @@ app.put(
           "https://images.unsplash.com/photo-1519046904884-53103b34b206?q=80&w=1170&auto=format&fit=crop";
       }
 
-      const updateDoc = { ...updatedData };
+      const setFields = { ...updatedData };
       if (geo.hasGeo) {
-        updateDoc.latitude = geo.latitude;
-        updateDoc.longitude = geo.longitude;
-        updateDoc.locationAddress = geo.locationAddress || "";
-      } else {
-        updateDoc.$unset = { latitude: 1, longitude: 1, locationAddress: 1 };
+        setFields.latitude = geo.latitude;
+        setFields.longitude = geo.longitude;
+        setFields.locationAddress = geo.locationAddress || "";
       }
 
       // jiya: Reset approval status if listing was edited and not yet approved
       if (listing.approvalStatus === "pending" || listing.approvalStatus === "rejected") {
-        updateDoc.approvalStatus = "pending";
-        updateDoc.approvedAt = null;
-        updateDoc.approvedBy = null;
+        setFields.approvalStatus = "pending";
+        setFields.approvedAt = null;
+        setFields.approvedBy = null;
       }
+
+      const updateDoc = geo.hasGeo
+        ? { $set: setFields }
+        : { $set: setFields, $unset: { latitude: 1, longitude: 1, locationAddress: 1 } };
 
       await Listing.findByIdAndUpdate(id, updateDoc);
       res.redirect(`/listings/${id}`);

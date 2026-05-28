@@ -308,15 +308,20 @@
 
         <div class="mb-3">
           <label for="password" class="form-label">Password</label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            class="form-control"
-            placeholder="Enter password"
-            autocomplete="current-password"
-            required
-          />
+          <div class="pw-wrap">
+            <input
+              id="password"
+              name="password"
+              type="password"
+              class="form-control"
+              placeholder="Enter password"
+              autocomplete="current-password"
+              required
+            />
+            <button type="button" class="pw-toggle-btn" data-pw-target="password" aria-label="Toggle password visibility">
+              <i class="fa-regular fa-eye"></i>
+            </button>
+          </div>
         </div>
 
         <button type="submit" class="login-submit-btn">Sign in</button>
@@ -487,6 +492,21 @@
     knob.addEventListener("click", function (e) {
       if (!dragging && currentPull < 5) toggleScene();
       e.preventDefault();
+    });
+
+    document.querySelectorAll(".pw-toggle-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var input = document.getElementById(btn.getAttribute("data-pw-target"));
+        if (!input) return;
+        var show = input.type === "password";
+        input.type = show ? "text" : "password";
+        var icon = btn.querySelector("i");
+        if (icon) {
+          icon.classList.toggle("fa-eye", !show);
+          icon.classList.toggle("fa-eye-slash", show);
+        }
+        btn.setAttribute("aria-label", show ? "Hide password" : "Show password");
+      });
     });
   })();
 </script>

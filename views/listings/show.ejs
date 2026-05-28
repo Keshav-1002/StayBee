@@ -51,7 +51,30 @@
     <div class="col-12 col-lg-5">
       <div class="card shadow-sm border-0">
         <div class="card-body">
-          <h4 class="mb-3">&#8377; <%= listing.price ? listing.price.toLocaleString("en-IN") : '—' %> / month</h4>
+          <div class="mb-3">
+            <h4 class="mb-1">
+              &#8377; <%= listing.price ? listing.price.toLocaleString("en-IN") : '—' %>
+              <span class="text-muted fs-6 fw-normal">/ month</span>
+            </h4>
+            <% if (listing.priceYearly != null && listing.priceYearly > 0) { %>
+              <div class="price-yearly-banner">
+                <i class="fa-solid fa-tag"></i>
+                <span class="pybanner-amount">&#8377; <%= listing.priceYearly.toLocaleString("en-IN") %></span>
+                <span class="pybanner-period">/ year</span>
+                <span class="pybanner-tag">Best Value</span>
+              </div>
+            <% } %>
+          </div>
+          <% if (listing.propertyType || listing.roomAccessType) { %>
+            <div class="mb-3 d-flex flex-wrap gap-2">
+              <% if (listing.propertyType) { %>
+                <span class="room-type-badge room-type-badge-lg"><%= ({'PG':'🛏️','Hostel':'🏢','Room':'🚪'})[listing.propertyType] || '' %>&nbsp;<%= listing.propertyType %></span>
+              <% } %>
+              <% if (listing.roomAccessType) { %>
+                <span class="room-type-badge room-type-badge-lg room-type-badge-access"><%= ({'Independent':'🔑','Dependent':'🔗'})[listing.roomAccessType] || '' %>&nbsp;<%= listing.roomAccessType %></span>
+              <% } %>
+            </div>
+          <% } %>
           <% if (listing.averageRating || listing.rating) { %>
             <p class="text-warning mb-3">
               <% for (var i = 1; i <= 5; i++) { %>
@@ -138,6 +161,34 @@
           <h5 class="mb-2">Description</h5>
           <p class="text-muted"><%= listing.description %></p>
 
+          <% if (listing.facilities && listing.facilities.length > 0) { %>
+            <% const FACILITY_ICONS = {
+              'Wi-Fi': 'fa-wifi',
+              'CCTV': 'fa-video',
+              'Geyser': 'fa-fire-flame-curved',
+              'Inverter': 'fa-bolt',
+              'Air Conditioner (AC)': 'fa-snowflake',
+              'Parking': 'fa-square-parking',
+              'Laundry': 'fa-soap',
+              'Water Supply': 'fa-faucet',
+              'Attached Bathroom': 'fa-bath',
+              'Kitchen Access': 'fa-utensils',
+              'Power Backup': 'fa-plug',
+              'Study Table': 'fa-pen-ruler',
+              'Security Guard': 'fa-shield-halved'
+            }; %>
+            <hr />
+            <h5 class="mb-3">Facilities &amp; Amenities</h5>
+            <div class="facilities-display-grid">
+              <% listing.facilities.forEach(function (facility) { %>
+                <div class="facility-display-item">
+                  <i class="fa-solid <%= FACILITY_ICONS[facility] || 'fa-circle-check' %>"></i>
+                  <span><%= facility %></span>
+                </div>
+              <% }); %>
+            </div>
+          <% } %>
+
           <hr />
           <h5 class="mb-3">Reviews</h5>
           <% if (err === 'already_reviewed') { %>
@@ -175,11 +226,25 @@
               <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editReviewModal">Edit my review</button>
             </div>
           <% } %>
-          <div class="reviews-list">
+          <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3" id="reviewSortBar">
+            <span class="small text-muted fw-semibold" id="reviewSortCount"></span>
+            <div class="d-flex align-items-center gap-2">
+              <label for="reviewSortSelect" class="form-label mb-0 small text-muted">Sort:</label>
+              <select id="reviewSortSelect" class="form-select form-select-sm sort-select-btn" style="width: auto;">
+                <option value="newest">Newest First</option>
+                <option value="oldest">Oldest First</option>
+                <option value="rating_desc">Highest Rated</option>
+                <option value="rating_asc">Lowest Rated</option>
+              </select>
+            </div>
+          </div>
+          <div class="reviews-list" id="reviewsList">
             <% const otherReviews = reviews ? reviews.filter(function(r) { return !userReview || r._id.toString() !== userReview._id.toString(); }) : []; %>
             <% if (otherReviews.length > 0) { %>
               <% otherReviews.forEach(function (r) { %>
-                <div class="border-bottom pb-3 mb-3">
+                <div class="border-bottom pb-3 mb-3 review-item"
+                     data-rating="<%= r.rating %>"
+                     data-date="<%= r.createdAt ? new Date(r.createdAt).getTime() : 0 %>">
                   <p class="mb-1 small fw-semibold"><%= r.author && r.author.username ? r.author.username : 'User' %></p>
                   <p class="text-warning mb-1 small">
                     <% for (var i = 1; i <= 5; i++) { %>
@@ -196,7 +261,8 @@
             <% } %>
           </div>
 
-          <% if (currentUser && currentUser.role === "admin") { %>
+          <% const isOwner = currentUser && listing.owner && listing.owner.toString() === currentUser.id; %>
+          <% if (currentUser && (currentUser.role === "admin" || isOwner)) { %>
             <div class="d-flex gap-2 mt-4">
               <a href="/listings/<%= listing._id %>/edit" class="btn btn-dark edit_btn">
                 Edit
@@ -267,10 +333,19 @@
 
 <script>
   (function () {
+    function popFavouriteIcon(icon) {
+      icon.classList.remove("fav-pop");
+      void icon.offsetWidth;
+      icon.classList.add("fav-pop");
+      icon.addEventListener("animationend", function () {
+        icon.classList.remove("fav-pop");
+      }, { once: true });
+    }
+
     function updateFavouriteUI(form, isFavourite) {
       form.setAttribute("data-is-favourite", isFavourite ? "true" : "false");
-      var btn = form.querySelector(".js-favourite-btn");
-      var icon = form.querySelector(".js-favourite-icon");
+      var btn   = form.querySelector(".js-favourite-btn");
+      var icon  = form.querySelector(".js-favourite-icon");
       var label = form.querySelector(".js-favourite-label");
       if (btn) {
         btn.classList.toggle("btn-outline-danger", isFavourite);
@@ -280,6 +355,7 @@
       if (icon) {
         icon.classList.toggle("fa-solid", isFavourite);
         icon.classList.toggle("fa-regular", !isFavourite);
+        popFavouriteIcon(icon);
       }
       if (label) {
         label.textContent = isFavourite ? "Remove from favourites" : "Add to favourites";
@@ -288,10 +364,18 @@
 
     var form = document.querySelector(".js-favourite-form");
     if (!form) return;
+
     form.addEventListener("submit", async function (e) {
       e.preventDefault();
+      var prevState = form.getAttribute("data-is-favourite") === "true";
+      var optimisticState = !prevState;
+
+      // Optimistic update — instant visual change
+      updateFavouriteUI(form, optimisticState);
+
       var btn = form.querySelector(".js-favourite-btn");
       if (btn) btn.disabled = true;
+
       try {
         var response = await fetch(form.action, {
           method: "POST",
@@ -302,12 +386,54 @@
         });
         if (!response.ok) throw new Error("Failed to toggle favourite");
         var data = await response.json();
-        updateFavouriteUI(form, !!data.isFavourite);
+        if (!!data.isFavourite !== optimisticState) {
+          updateFavouriteUI(form, !!data.isFavourite);
+        }
       } catch (err) {
+        // Revert on error
+        updateFavouriteUI(form, prevState);
         form.submit();
       } finally {
         if (btn) btn.disabled = false;
       }
+    });
+  })();
+</script>
+
+<script>
+  (function () {
+    var sortBar = document.getElementById("reviewSortBar");
+    var sortSelect = document.getElementById("reviewSortSelect");
+    var reviewsList = document.getElementById("reviewsList");
+    var countEl = document.getElementById("reviewSortCount");
+
+    if (!sortBar || !sortSelect || !reviewsList) return;
+
+    var items = Array.from(reviewsList.querySelectorAll(".review-item"));
+
+    if (items.length < 2) {
+      sortBar.style.display = "none";
+      return;
+    }
+
+    if (countEl) countEl.textContent = items.length + " review" + (items.length === 1 ? "" : "s");
+
+    function applySort(order) {
+      var sorted = items.slice();
+      if (order === "newest") {
+        sorted.sort(function (a, b) { return Number(b.dataset.date) - Number(a.dataset.date); });
+      } else if (order === "oldest") {
+        sorted.sort(function (a, b) { return Number(a.dataset.date) - Number(b.dataset.date); });
+      } else if (order === "rating_desc") {
+        sorted.sort(function (a, b) { return Number(b.dataset.rating) - Number(a.dataset.rating); });
+      } else if (order === "rating_asc") {
+        sorted.sort(function (a, b) { return Number(a.dataset.rating) - Number(b.dataset.rating); });
+      }
+      sorted.forEach(function (item) { reviewsList.appendChild(item); });
+    }
+
+    sortSelect.addEventListener("change", function () {
+      applySort(sortSelect.value);
     });
   })();
 </script>

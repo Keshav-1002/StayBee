@@ -45,8 +45,10 @@
         onchange="this.form.submit()"
       >
         <option value="">Default</option>
-        <option value="price_asc" <%= (typeof filters !== 'undefined' && filters.sort === 'price_asc') ? 'selected' : '' %>>Low to High</option>
-        <option value="price_desc" <%= (typeof filters !== 'undefined' && filters.sort === 'price_desc') ? 'selected' : '' %>>High to Low</option>
+        <option value="price_asc" <%= (typeof filters !== 'undefined' && filters.sort === 'price_asc') ? 'selected' : '' %>>Price: Low to High</option>
+        <option value="price_desc" <%= (typeof filters !== 'undefined' && filters.sort === 'price_desc') ? 'selected' : '' %>>Price: High to Low</option>
+        <option value="rating_desc" <%= (typeof filters !== 'undefined' && filters.sort === 'rating_desc') ? 'selected' : '' %>>Highest Rated</option>
+        <option value="rating_asc" <%= (typeof filters !== 'undefined' && filters.sort === 'rating_asc') ? 'selected' : '' %>>Lowest Rated</option>
       </select>
     </form>
   </div>
@@ -96,12 +98,14 @@
   </div>
 </div>
 
+<% var PT_EMOJIS = {'PG':'🛏️','Hostel':'🏢','Room':'🚪'}; %>
+<% var RAT_EMOJIS = {'Independent':'🔑','Dependent':'🔗'}; %>
 <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3 g-md-4 mt-3" id="listing-grid">
   <% if (allListing && allListing.length > 0) { %>
     <% allListing.forEach(function (listing) { %>
-      <% const isFav = (typeof userFavouriteIds !== 'undefined' && userFavouriteIds) ? userFavouriteIds.includes(listing._id.toString()) : false; %>
-      <% const statusText = listing.status || 'Available'; %>
-      <% const statusClass = statusText === 'Available' ? 'status-available' : (statusText === 'Booked' ? 'status-booked' : 'status-comingsoon'); %>
+      <% var isFav = (typeof userFavouriteIds !== 'undefined' && userFavouriteIds) ? userFavouriteIds.includes(listing._id.toString()) : false; %>
+      <% var statusText = listing.status || 'Available'; %>
+      <% var statusClass = statusText === 'Available' ? 'status-available' : (statusText === 'Booked' ? 'status-booked' : 'status-comingsoon'); %>
       <div class="col">
         <a
           href="/listings/<%= listing._id %>"
@@ -201,11 +205,34 @@
                   <span class="text-muted ms-1">(<%= totalReviews %> <%= totalReviews === 1 ? 'review' : 'reviews' %>)</span>
                 </p>
               <% } %>
-              <p class="card-text">
-                &#8377;
-                <%= listing.price ? listing.price.toLocaleString("en-IN") : '—' %>
-                / month
-              </p>
+              <div class="price-block">
+                <div class="price-block-inner">
+                  <div class="price-block-left">
+                    <p class="card-text mb-1">
+                      <span class="fw-semibold">&#8377; <%= listing.price ? listing.price.toLocaleString("en-IN") : '—' %></span>
+                      <span class="text-muted small">/ month</span>
+                    </p>
+                    <% if (listing.priceYearly != null && listing.priceYearly > 0) { %>
+                      <p class="card-text mb-0 mt-1">
+                        <span class="price-yearly-pill">
+                          <i class="fa-solid fa-tag"></i>
+                          &#8377; <%= listing.priceYearly.toLocaleString("en-IN") %> / year &bull; Best Value
+                        </span>
+                      </p>
+                    <% } %>
+                  </div>
+                  <% if (listing.propertyType || listing.roomAccessType) { %>
+                    <div class="room-type-badges-col">
+                      <% if (listing.propertyType) { %>
+                        <span class="room-type-badge"><%= PT_EMOJIS[listing.propertyType] || '' %>&nbsp;<%= listing.propertyType %></span>
+                      <% } %>
+                      <% if (listing.roomAccessType) { %>
+                        <span class="room-type-badge room-type-badge-access"><%= RAT_EMOJIS[listing.roomAccessType] || '' %>&nbsp;<%= listing.roomAccessType %></span>
+                      <% } %>
+                    </div>
+                  <% } %>
+                </div>
+              </div>
             </div>
           </div>
         </a>
@@ -515,25 +542,44 @@
       });
     });
 
+    function popFavouriteIcon(icon) {
+      icon.classList.remove("fav-pop");
+      // Force reflow so the animation restarts if clicked again quickly
+      void icon.offsetWidth;
+      icon.classList.add("fav-pop");
+      icon.addEventListener("animationend", function () {
+        icon.classList.remove("fav-pop");
+      }, { once: true });
+    }
+
     function updateFavouriteUI(form, isFavourite) {
       form.setAttribute("data-is-favourite", isFavourite ? "true" : "false");
-      var btn = form.querySelector(".js-favourite-btn");
-      var icon = form.querySelector(".js-favourite-icon");
-      if (btn) {
+      // There are two buttons per card (one for mobile, one for desktop).
+      // querySelectorAll updates both so the visible one always reflects state.
+      form.querySelectorAll(".js-favourite-btn").forEach(function (btn) {
         btn.setAttribute("title", isFavourite ? "Remove from favourites" : "Add to favourites");
-      }
-      if (icon) {
+      });
+      form.querySelectorAll(".js-favourite-icon").forEach(function (icon) {
         icon.classList.toggle("fa-solid", isFavourite);
         icon.classList.toggle("fa-regular", !isFavourite);
         icon.classList.toggle("text-danger", isFavourite);
-      }
+        popFavouriteIcon(icon);
+      });
     }
 
     document.querySelectorAll(".js-favourite-form").forEach(function (form) {
       form.addEventListener("submit", async function (e) {
         e.preventDefault();
-        var btn = form.querySelector(".js-favourite-btn");
-        if (btn) btn.disabled = true;
+        var prevState = form.getAttribute("data-is-favourite") === "true";
+        var optimisticState = !prevState;
+
+        // Optimistic update — icon changes instantly on click
+        updateFavouriteUI(form, optimisticState);
+
+        // Disable all buttons in this form during the request
+        var btns = form.querySelectorAll(".js-favourite-btn");
+        btns.forEach(function (b) { b.disabled = true; });
+
         try {
           var response = await fetch(form.action, {
             method: "POST",
@@ -544,11 +590,16 @@
           });
           if (!response.ok) throw new Error("Failed to toggle favourite");
           var data = await response.json();
-          updateFavouriteUI(form, !!data.isFavourite);
+          // Sync to server truth if it differs from the optimistic guess
+          if (!!data.isFavourite !== optimisticState) {
+            updateFavouriteUI(form, !!data.isFavourite);
+          }
         } catch (err) {
+          // Revert optimistic change on error
+          updateFavouriteUI(form, prevState);
           form.submit();
         } finally {
-          if (btn) btn.disabled = false;
+          btns.forEach(function (b) { b.disabled = false; });
         }
       });
     });

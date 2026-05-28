@@ -354,27 +354,37 @@
         <div class="row">
           <div class="mb-2 col-md-6">
             <label for="password" class="form-label">Password</label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              class="form-control"
-              placeholder="Enter password"
-              autocomplete="new-password"
-              required
-            />
+            <div class="pw-wrap">
+              <input
+                id="password"
+                name="password"
+                type="password"
+                class="form-control"
+                placeholder="Enter password"
+                autocomplete="new-password"
+                required
+              />
+              <button type="button" class="pw-toggle-btn" data-pw-target="password" aria-label="Show password">
+                <i class="fa-regular fa-eye"></i>
+              </button>
+            </div>
           </div>
           <div class="mb-2 col-md-6">
             <label for="confirmPassword" class="form-label">Confirm Password</label>
-            <input
-              id="confirmPassword"
-              name="confirmPassword"
-              type="password"
-              class="form-control"
-              placeholder="Confirm password"
-              autocomplete="new-password"
-              required
-            />
+            <div class="pw-wrap">
+              <input
+                id="confirmPassword"
+                name="confirmPassword"
+                type="password"
+                class="form-control"
+                placeholder="Confirm password"
+                autocomplete="new-password"
+                required
+              />
+              <button type="button" class="pw-toggle-btn" data-pw-target="confirmPassword" aria-label="Show password">
+                <i class="fa-regular fa-eye"></i>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -398,13 +408,18 @@
 
         <div class="mb-3 d-none" id="adminSecretWrap">
           <label for="adminSignupSecret" class="form-label">Admin secret (only for Admin)</label>
-          <input
-            id="adminSignupSecret"
-            name="adminSignupSecret"
-            type="password"
-            class="form-control"
-            placeholder="Enter admin secret if you selected Admin"
-          />
+          <div class="pw-wrap">
+            <input
+              id="adminSignupSecret"
+              name="adminSignupSecret"
+              type="password"
+              class="form-control"
+              placeholder="Enter admin secret if you selected Admin"
+            />
+            <button type="button" class="pw-toggle-btn" data-pw-target="adminSignupSecret" aria-label="Show password">
+              <i class="fa-regular fa-eye"></i>
+            </button>
+          </div>
         </div>
 
         <button type="submit" class="register-submit-btn">Create Account</button>
@@ -599,6 +614,21 @@
     knob.addEventListener("click", function (e) {
       if (!dragging && currentPull < 5) toggleScene();
       e.preventDefault();
+    });
+
+    document.querySelectorAll(".pw-toggle-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var input = document.getElementById(btn.getAttribute("data-pw-target"));
+        if (!input) return;
+        var show = input.type === "password";
+        input.type = show ? "text" : "password";
+        var icon = btn.querySelector("i");
+        if (icon) {
+          icon.classList.toggle("fa-eye", !show);
+          icon.classList.toggle("fa-eye-slash", show);
+        }
+        btn.setAttribute("aria-label", show ? "Hide password" : "Show password");
+      });
     });
 
     function syncRoleUI() {
