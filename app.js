@@ -72,33 +72,46 @@ app.use((req, res, next) => {
   next();
 });
 
-const PROPERTY_TYPES = ['PG', 'Hostel', 'Room'];
-const ROOM_ACCESS_TYPES = ['Independent', 'Dependent'];
+const PROPERTY_TYPES = ["PG", "Hostel", "Room"];
+const ROOM_ACCESS_TYPES = ["Independent", "Dependent"];
 const FACILITIES_LIST = [
-  'Wi-Fi', 'CCTV', 'Geyser', 'Inverter', 'Air Conditioner (AC)',
-  'Parking', 'Laundry', 'Water Supply', 'Attached Bathroom',
-  'Kitchen Access', 'Power Backup', 'Study Table', 'Security Guard',
+  "Wi-Fi",
+  "CCTV",
+  "Geyser",
+  "Inverter",
+  "Air Conditioner (AC)",
+  "Parking",
+  "Laundry",
+  "Water Supply",
+  "Attached Bathroom",
+  "Kitchen Access",
+  "Power Backup",
+  "Study Table",
+  "Security Guard",
 ];
 
 function parsePropertyType(raw) {
-  if (!raw || typeof raw !== 'string') return null;
+  if (!raw || typeof raw !== "string") return null;
   return PROPERTY_TYPES.includes(raw.trim()) ? raw.trim() : null;
 }
 
 function parseRoomAccessType(raw) {
-  if (!raw || typeof raw !== 'string') return null;
+  if (!raw || typeof raw !== "string") return null;
   return ROOM_ACCESS_TYPES.includes(raw.trim()) ? raw.trim() : null;
 }
 
 function parseFacilities(raw) {
-  if (!raw || typeof raw !== 'string') return [];
-  return raw.split(',').map(v => v.trim()).filter(v => FACILITIES_LIST.includes(v));
+  if (!raw || typeof raw !== "string") return [];
+  return raw
+    .split(",")
+    .map((v) => v.trim())
+    .filter((v) => FACILITIES_LIST.includes(v));
 }
 
 function parsePriceYearly(raw) {
-  if (raw === undefined || raw === null || raw === '') return null;
+  if (raw === undefined || raw === null || raw === "") return null;
   const n = Number(raw);
-  return (!isNaN(n) && n > 0) ? n : null;
+  return !isNaN(n) && n > 0 ? n : null;
 }
 
 function parseListingGeoFields(listingBody) {
@@ -107,13 +120,9 @@ function parseListingGeoFields(listingBody) {
   const lngRaw = listingBody.longitude;
   const addr = (listingBody.locationAddress || "").trim();
   const emptyLat =
-    latRaw === undefined ||
-    latRaw === null ||
-    String(latRaw).trim() === "";
+    latRaw === undefined || latRaw === null || String(latRaw).trim() === "";
   const emptyLng =
-    lngRaw === undefined ||
-    lngRaw === null ||
-    String(lngRaw).trim() === "";
+    lngRaw === undefined || lngRaw === null || String(lngRaw).trim() === "";
   if (emptyLat || emptyLng) {
     return { hasGeo: false };
   }
@@ -175,21 +184,21 @@ async function main() {
   // Back-fill priceYearly: null for documents that pre-date the field
   await Listing.updateMany(
     { priceYearly: { $exists: false } },
-    { $set: { priceYearly: null } }
+    { $set: { priceYearly: null } },
   );
   // Back-fill facilities for documents that pre-date the field
   await Listing.updateMany(
     { facilities: { $exists: false } },
-    { $set: { facilities: [] } }
+    { $set: { facilities: [] } },
   );
   // Back-fill propertyType / roomAccessType for documents that pre-date the split
   await Listing.updateMany(
     { propertyType: { $exists: false } },
-    { $set: { propertyType: null } }
+    { $set: { propertyType: null } },
   );
   await Listing.updateMany(
     { roomAccessType: { $exists: false } },
-    { $set: { roomAccessType: null } }
+    { $set: { roomAccessType: null } },
   );
 }
 
@@ -223,11 +232,9 @@ app.post("/register", async (req, res) => {
         .status(400)
         .render("auth/register.ejs", { error: "Username is required." });
     if (password.length < 4)
-      return res
-        .status(400)
-        .render("auth/register.ejs", {
-          error: "Password must be at least 4 characters.",
-        });
+      return res.status(400).render("auth/register.ejs", {
+        error: "Password must be at least 4 characters.",
+      });
     if (password !== confirmPassword)
       return res
         .status(400)
@@ -236,11 +243,9 @@ app.post("/register", async (req, res) => {
     if (role === "admin") {
       const requiredSecret = process.env.ADMIN_SIGNUP_SECRET || "staybee-admin";
       if (adminSignupSecret !== requiredSecret) {
-        return res
-          .status(400)
-          .render("auth/register.ejs", {
-            error: "Invalid admin secret. Ask your admin for the secret.",
-          });
+        return res.status(400).render("auth/register.ejs", {
+          error: "Invalid admin secret. Ask your admin for the secret.",
+        });
       }
     }
 
@@ -256,11 +261,9 @@ app.post("/register", async (req, res) => {
     res.redirect("/login");
   } catch (err) {
     console.error("Register error:", err);
-    res
-      .status(500)
-      .render("auth/register.ejs", {
-        error: "Something went wrong. Please try again.",
-      });
+    res.status(500).render("auth/register.ejs", {
+      error: "Something went wrong. Please try again.",
+    });
   }
 });
 
@@ -270,11 +273,9 @@ app.post("/login", async (req, res) => {
     const password = req.body?.password || "";
 
     if (!username || !password) {
-      return res
-        .status(400)
-        .render("auth/login.ejs", {
-          error: "Username and password are required.",
-        });
+      return res.status(400).render("auth/login.ejs", {
+        error: "Username and password are required.",
+      });
     }
 
     const user = await User.findOne({ username });
@@ -297,11 +298,9 @@ app.post("/login", async (req, res) => {
     res.redirect("/listings");
   } catch (err) {
     console.error("Login error:", err);
-    res
-      .status(500)
-      .render("auth/login.ejs", {
-        error: "Something went wrong. Please try again.",
-      });
+    res.status(500).render("auth/login.ejs", {
+      error: "Something went wrong. Please try again.",
+    });
   }
 });
 
@@ -330,13 +329,15 @@ app.get("/listings", async (req, res) => {
     filter.location = { $regex: location, $options: "i" };
   }
 
-  const requestLat = lat != null && String(lat).trim() !== "" ? parseFloat(lat) : null;
-  const requestLng = lng != null && String(lng).trim() !== "" ? parseFloat(lng) : null;
+  const requestLat =
+    lat != null && String(lat).trim() !== "" ? parseFloat(lat) : null;
+  const requestLng =
+    lng != null && String(lng).trim() !== "" ? parseFloat(lng) : null;
   const useNear = Number.isFinite(requestLat) && Number.isFinite(requestLng);
   const effectiveRadiusKm =
     radiusKm != null && String(radiusKm).trim() !== ""
       ? Math.max(1, Math.min(200, parseFloat(radiusKm)))
-      : 25;
+      : 1;
 
   function haversineKm(lat1, lng1, lat2, lng2) {
     const toRad = (d) => (d * Math.PI) / 180;
@@ -358,7 +359,9 @@ app.get("/listings", async (req, res) => {
     // Fetch without DB-side geo index; filter/sort in memory.
     const base = await Listing.find(filter);
     const withCoords = base
-      .filter((l) => Number.isFinite(l.latitude) && Number.isFinite(l.longitude))
+      .filter(
+        (l) => Number.isFinite(l.latitude) && Number.isFinite(l.longitude),
+      )
       .map((l) => ({
         listing: l,
         distanceKm: haversineKm(
@@ -391,9 +394,13 @@ app.get("/listings", async (req, res) => {
   // Rating sort: applied after geo/non-geo block so it works for both paths.
   // Listings with no rating (null) are always pushed to the end.
   if (sort === "rating_desc") {
-    allListing.sort((a, b) => (b.averageRating ?? -1) - (a.averageRating ?? -1));
+    allListing.sort(
+      (a, b) => (b.averageRating ?? -1) - (a.averageRating ?? -1),
+    );
   } else if (sort === "rating_asc") {
-    allListing.sort((a, b) => (a.averageRating ?? Infinity) - (b.averageRating ?? Infinity));
+    allListing.sort(
+      (a, b) => (a.averageRating ?? Infinity) - (b.averageRating ?? Infinity),
+    );
   }
 
   let userFavouriteIds = [];
@@ -422,7 +429,11 @@ app.get("/listings/new", requireLogin, (req, res) => {
 
 // jiya: Admin NEW Route - disabled for admins as requested
 app.get("/admin/listings/new", requireAdmin, (req, res) => {
-  res.status(403).send("Admins cannot create listings directly. Users create listings for approval.");
+  res
+    .status(403)
+    .send(
+      "Admins cannot create listings directly. Users create listings for approval.",
+    );
 });
 
 //Show route
@@ -480,7 +491,9 @@ app.post(
 
       listingData.priceYearly = parsePriceYearly(listingData.priceYearly);
       listingData.propertyType = parsePropertyType(listingData.propertyType);
-      listingData.roomAccessType = parseRoomAccessType(listingData.roomAccessType);
+      listingData.roomAccessType = parseRoomAccessType(
+        listingData.roomAccessType,
+      );
       listingData.facilities = parseFacilities(listingData.facilities);
 
       if (!listingData.status) listingData.status = "Available";
@@ -520,7 +533,11 @@ app.post(
   requireAdmin,
   upload.array("images", 10),
   async (req, res) => {
-    res.status(403).send("Admins cannot create listings directly. Users create listings for approval.");
+    res
+      .status(403)
+      .send(
+        "Admins cannot create listings directly. Users create listings for approval.",
+      );
   },
 );
 
@@ -528,13 +545,16 @@ app.post(
 app.get("/listings/:id/edit", requireOwnership, async (req, res) => {
   let { id } = req.params;
   const listing = await Listing.findById(id);
-  
+
   if (!listing) {
     return res.status(404).send("Listing not found.");
   }
 
   // jiya: Check if user owns the listing or is admin
-  if (req.session.user.role !== "admin" && listing.owner.toString() !== req.session.user.id) {
+  if (
+    req.session.user.role !== "admin" &&
+    listing.owner.toString() !== req.session.user.id
+  ) {
     return res.status(403).send("You can only edit your own listings.");
   }
 
@@ -543,7 +563,11 @@ app.get("/listings/:id/edit", requireOwnership, async (req, res) => {
 
 // jiya: Admin edit route - disabled
 app.get("/admin/listings/:id/edit", requireAdmin, async (req, res) => {
-  res.status(403).send("Admins cannot edit listings directly. Users edit their own listings.");
+  res
+    .status(403)
+    .send(
+      "Admins cannot edit listings directly. Users edit their own listings.",
+    );
 });
 
 // jiya: Update route - allows users to update their own listings
@@ -555,11 +579,14 @@ app.put(
     try {
       let { id } = req.params;
       const listing = await Listing.findById(id);
-      
+
       if (!listing) return res.status(404).send("Listing not found.");
 
       // jiya: Check if user owns the listing or is admin
-      if (req.session.user.role !== "admin" && listing.owner.toString() !== req.session.user.id) {
+      if (
+        req.session.user.role !== "admin" &&
+        listing.owner.toString() !== req.session.user.id
+      ) {
         return res.status(403).send("You can only update your own listings.");
       }
 
@@ -571,13 +598,15 @@ app.put(
       delete updatedData.locationAddress;
 
       updatedData.priceYearly = parsePriceYearly(updatedData.priceYearly);
-      if ('propertyType' in rawListing) {
+      if ("propertyType" in rawListing) {
         updatedData.propertyType = parsePropertyType(updatedData.propertyType);
       } else {
         delete updatedData.propertyType;
       }
-      if ('roomAccessType' in rawListing) {
-        updatedData.roomAccessType = parseRoomAccessType(updatedData.roomAccessType);
+      if ("roomAccessType" in rawListing) {
+        updatedData.roomAccessType = parseRoomAccessType(
+          updatedData.roomAccessType,
+        );
       } else {
         delete updatedData.roomAccessType;
       }
@@ -622,7 +651,10 @@ app.put(
       }
 
       // jiya: Reset approval status if listing was edited and not yet approved
-      if (listing.approvalStatus === "pending" || listing.approvalStatus === "rejected") {
+      if (
+        listing.approvalStatus === "pending" ||
+        listing.approvalStatus === "rejected"
+      ) {
         setFields.approvalStatus = "pending";
         setFields.approvedAt = null;
         setFields.approvedBy = null;
@@ -630,7 +662,10 @@ app.put(
 
       const updateDoc = geo.hasGeo
         ? { $set: setFields }
-        : { $set: setFields, $unset: { latitude: 1, longitude: 1, locationAddress: 1 } };
+        : {
+            $set: setFields,
+            $unset: { latitude: 1, longitude: 1, locationAddress: 1 },
+          };
 
       await Listing.findByIdAndUpdate(id, updateDoc);
       res.redirect(`/listings/${id}`);
@@ -647,7 +682,11 @@ app.put(
   requireAdmin,
   upload.array("images", 10),
   async (req, res) => {
-    res.status(403).send("Admins cannot update listings directly. Users update their own listings.");
+    res
+      .status(403)
+      .send(
+        "Admins cannot update listings directly. Users update their own listings.",
+      );
   },
 );
 
@@ -655,19 +694,22 @@ app.put(
 app.delete("/listings/:id", requireOwnership, async (req, res) => {
   let { id } = req.params;
   const listing = await Listing.findById(id);
-  
+
   if (!listing) {
     return res.status(404).send("Listing not found.");
   }
 
   // jiya: Check if user owns the listing or is admin
-  if (req.session.user.role !== "admin" && listing.owner.toString() !== req.session.user.id) {
+  if (
+    req.session.user.role !== "admin" &&
+    listing.owner.toString() !== req.session.user.id
+  ) {
     return res.status(403).send("You can only delete your own listings.");
   }
 
   let deletedListing = await Listing.findByIdAndDelete(id);
   console.log(deletedListing);
-  
+
   // jiya: Redirect to appropriate page based on user role
   if (req.session.user.role === "admin") {
     res.redirect("/admin/pending-listings");
@@ -678,7 +720,11 @@ app.delete("/listings/:id", requireOwnership, async (req, res) => {
 
 // jiya: Admin delete route - disabled
 app.delete("/admin/listings/:id", requireAdmin, async (req, res) => {
-  res.status(403).send("Admins cannot delete listings directly. Users delete their own listings.");
+  res
+    .status(403)
+    .send(
+      "Admins cannot delete listings directly. Users delete their own listings.",
+    );
 });
 
 // jiya: My Listings route - shows user's own listings
@@ -687,7 +733,7 @@ app.get("/my-listings", requireLogin, async (req, res) => {
   const userListings = await Listing.find({ owner: userId })
     .sort({ createdAt: -1 })
     .populate("owner", "username");
-  
+
   res.render("listings/my-listings.ejs", { allListing: userListings });
 });
 
@@ -697,18 +743,22 @@ app.get("/admin/pending-listings", requireAdmin, async (req, res) => {
   let pendingListings = await Listing.find({ approvalStatus: "pending" })
     .sort({ createdAt: -1 })
     .populate("owner", "username");
-  
+
   // jiya: If no results, try without populate first
   if (pendingListings.length === 0) {
-    const pendingWithoutPopulate = await Listing.find({ approvalStatus: "pending" })
-      .sort({ createdAt: -1 });
-    
+    const pendingWithoutPopulate = await Listing.find({
+      approvalStatus: "pending",
+    }).sort({ createdAt: -1 });
+
     // jiya: Try to populate only those that have an owner
     pendingListings = [];
     for (const listing of pendingWithoutPopulate) {
       if (listing.owner) {
         try {
-          const populated = await Listing.findById(listing._id).populate("owner", "username");
+          const populated = await Listing.findById(listing._id).populate(
+            "owner",
+            "username",
+          );
           pendingListings.push(populated);
         } catch (err) {
           // jiya: If populate fails, add without owner
@@ -720,7 +770,7 @@ app.get("/admin/pending-listings", requireAdmin, async (req, res) => {
       }
     }
   }
-  
+
   res.render("admin/pending-listings.ejs", { allListing: pendingListings });
 });
 
@@ -730,7 +780,7 @@ app.get("/admin/approved-listings", requireAdmin, async (req, res) => {
     .sort({ approvedAt: -1 })
     .populate("owner", "username")
     .populate("approvedBy", "username");
-  
+
   res.render("admin/approved-listings.ejs", { allListing: approvedListings });
 });
 
@@ -739,7 +789,7 @@ app.get("/admin/rejected-listings", requireAdmin, async (req, res) => {
   const rejectedListings = await Listing.find({ approvalStatus: "rejected" })
     .sort({ createdAt: -1 })
     .populate("owner", "username");
-  
+
   res.render("admin/rejected-listings.ejs", { allListing: rejectedListings });
 });
 
@@ -748,21 +798,21 @@ app.post("/admin/listings/:id/approve", requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const listing = await Listing.findById(id);
-    
+
     if (!listing) {
       return res.status(404).send("Listing not found.");
     }
-    
+
     if (listing.approvalStatus !== "pending") {
       return res.status(400).send("Listing is not pending approval.");
     }
-    
+
     await Listing.findByIdAndUpdate(id, {
       approvalStatus: "approved",
       approvedAt: new Date(),
-      approvedBy: req.session.user.id
+      approvedBy: req.session.user.id,
     });
-    
+
     res.redirect("/admin/pending-listings");
   } catch (err) {
     console.error("Error approving listing:", err);
@@ -775,19 +825,19 @@ app.post("/admin/listings/:id/reject", requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const listing = await Listing.findById(id);
-    
+
     if (!listing) {
       return res.status(404).send("Listing not found.");
     }
-    
+
     if (listing.approvalStatus !== "pending") {
       return res.status(400).send("Listing is not pending approval.");
     }
-    
+
     await Listing.findByIdAndUpdate(id, {
-      approvalStatus: "rejected"
+      approvalStatus: "rejected",
     });
-    
+
     res.redirect("/admin/pending-listings");
   } catch (err) {
     console.error("Error rejecting listing:", err);
